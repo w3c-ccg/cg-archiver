@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import config from './config.js';
 import fs from 'node:fs';
-import { getRecords, downloadVideo, downloadTranscript }
-  from './lib/google-meet.js';
+import {
+  getRecords, archiveVideo, archiveTranscript, generateSummary, emailSummary
+} from './lib/google-apps.js';
 import moment from 'moment';
 import path from 'node:path';
 import process from 'process';
@@ -14,67 +15,63 @@ const CACHE_FILENAME = 'cache.json';
 // create the CLI and parse the options
 const program = new Command();
 program
-  .option('-d, --date <YYYY-MM-DD>', 'Date to process')
+  .option('-d, --date <YYYY-MM-DD>',
+    'Meeting date to process', moment().format('YYYY-MM-DD'))
+  .option('-e, --email',
+    'Send summary email', false)
   .parse(process.argv);
 const options = program.opts();
 
 let date = (options.date) ?
   moment(options.date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
 
-// writes a transcript with a given media type
-async function writeTranscript({config, meeting, mediaType, docLocation}) {
-  let fileSuffix = 'unknown';
-
-  // set the file suffix
-  if(mediaType === 'text/plain') {
-    fileSuffix = 'log';
-  } else if(mediaType === 'text/markdown') {
-    fileSuffix = 'md';
-  } else {
-    throw Error('Unsupported media type: '+ mediaType);
-  }
-
-  let transcriptFile = await downloadTranscript({mediaType, docLocation});
-
-  // write the transcript to disk
-  const transcriptFilename = path.join(config.logDir,
-    `${config.community}-${meeting.name}-${date}.${fileSuffix}`);
-  fs.writeFileSync(transcriptFilename, transcriptFile);
-}
-
 for(let meeting of config.meetings) {
+  meeting.slug = meeting.name.toLowerCase().replace(' ', '-');
   // get record for meeting and date
   let record = await getRecords({meeting: meeting.googleMeetId, date});
   if(!record.transcript) {
     continue;
   } else {
-    console.log(`Archiving ${meeting.name} meeting on ${date}...`);
+    console.log(`Archiving ${meeting.name} meeting for ${date}...`);
   }
 
-  // download the video recording
-  console.log('  - Downloading video recording.');
-  let videoFile = await downloadVideo(
-    {config, driveLocation: record.recording.driveDestination});
-
-  // write the video recording to disk
-  const videoFilename = path.join(config.logDir,
-    `${config.community}-${meeting.name}-${date}.mp4`);
-  fs.writeFileSync(videoFilename, Buffer.from(await videoFile.arrayBuffer()));
-
-
-  // download the transcripts
-  console.log('  - Downloading transcripts.');
-  await writeTranscript({
-    config,
-    meeting,
-    mediaType: 'text/markdown',
-    docLocation: record.transcript.docsDestination
+  // archive the video recording
+  const videoFilename = path.join(
+    config.logDir, `${config.community}-${meeting.slug}-${date}.mp4`);
+  const videoStream = fs.createWriteStream(videoFilename);
+  await archiveVideo({
+    fileStream: videoStream,
+    driveLocation: record.recording.driveDestination
   });
-  await writeTranscript({
-    config,
-    meeting,
+
+  // write .log transcript
+  const logTranscriptFilename = path.join(config.logDir,
+    `${config.community}-${meeting.slug}-${date}.log`);
+  const logFileStream = fs.createWriteStream(logTranscriptFilename);
+  await archiveTranscript({
     mediaType: 'text/plain',
-    docLocation: record.transcript.docsDestination
+    docLocation: record.transcript.docsDestination,
+    fileStream: logFileStream
   });
 
+  // write .md transcript
+  const mdTranscriptFilename = path.join(config.logDir,
+    `${config.community}-${meeting.slug}-${date}.md`);
+  const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
+  await archiveTranscript({
+    mediaType: 'text/markdown',
+    docLocation: record.transcript.docsDestination,
+    fileStream: mdFileStream
+  });
+
+  if(options.email) {
+    // generate meeting summary
+    const summary = await generateSummary({
+      config,
+      transcriptFilename: mdTranscriptFilename
+    });
+
+    // email meeting summary
+    await emailSummary({config, meeting, summary});
+  }
 }

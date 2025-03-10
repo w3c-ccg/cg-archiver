@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Archives meetings for a W3C Community Group",
   "main": "cg-archiver",
+  "type": "module",
   "directories": {
     "lib": "lib"
   },
