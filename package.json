@@ -33,6 +33,7 @@
     "@google-cloud/local-auth": "^3.0.1",
     "commander": "^13.1.0",
     "googleapis": "^146.0.0",
-    "moment": "^2.30.1"
+    "moment": "^2.30.1",
+    "showdown": "^2.1.0"
   }
 }

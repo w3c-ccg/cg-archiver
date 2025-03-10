@@ -2,7 +2,8 @@
 import config from './config.js';
 import fs from 'node:fs';
 import {
-  getRecords, archiveVideo, archiveTranscript, generateSummary, emailSummary
+  getRecords, archiveVideo, archiveTranscript, transcriptExists,
+  generateSummary, emailSummary
 } from './lib/google-apps.js';
 import moment from 'moment';
 import path from 'node:path';
@@ -38,40 +39,45 @@ for(let meeting of config.meetings) {
   // archive the video recording
   const videoFilename = path.join(
     config.logDir, `${config.community}-${meeting.slug}-${date}.mp4`);
-  const videoStream = fs.createWriteStream(videoFilename);
-  await archiveVideo({
-    fileStream: videoStream,
-    driveLocation: record.recording.driveDestination
-  });
+  // const videoStream = fs.createWriteStream(videoFilename);
+  // await archiveVideo({
+  //   fileStream: videoStream,
+  //   driveLocation: record.recording.driveDestination
+  // });
 
   // write .log transcript
   const logTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.log`);
-  const logFileStream = fs.createWriteStream(logTranscriptFilename);
-  await archiveTranscript({
-    mediaType: 'text/plain',
-    docLocation: record.transcript.docsDestination,
-    fileStream: logFileStream
-  });
+  // const logFileStream = fs.createWriteStream(logTranscriptFilename);
+  // await archiveTranscript({
+  //   mediaType: 'text/plain',
+  //   docLocation: record.transcript.docsDestination,
+  //   fileStream: logFileStream
+  // });
 
   // write .md transcript
   const mdTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.md`);
-  const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
-  await archiveTranscript({
-    mediaType: 'text/markdown',
-    docLocation: record.transcript.docsDestination,
-    fileStream: mdFileStream
-  });
+  // const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
+  // await archiveTranscript({
+  //   mediaType: 'text/markdown',
+  //   docLocation: record.transcript.docsDestination,
+  //   fileStream: mdFileStream
+  // });
 
   if(options.email) {
-    // generate meeting summary
-    const summary = await generateSummary({
-      config,
-      transcriptFilename: mdTranscriptFilename
-    });
+    // get the transcript
+    const transcript =
+      await transcriptExists({transcriptFilename: mdTranscriptFilename});
 
-    // email meeting summary
-    await emailSummary({config, meeting, summary});
+    // generate meeting summary
+    if(transcript.length > 100) {
+      const summary = await generateSummary({config, meeting, date, transcript});
+
+      // email meeting summary
+      await emailSummary({config, meeting, date, summary, transcript});
+    } else {
+      console.error('Error: Failed to summarize empty transcript.');
+    }
   }
 }
