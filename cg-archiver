@@ -39,31 +39,43 @@ for(let meeting of config.meetings) {
   // archive the video recording
   const videoFilename = path.join(
     config.logDir, `${config.community}-${meeting.slug}-${date}.mp4`);
-  const videoStream = fs.createWriteStream(videoFilename);
-  await archiveVideo({
-    fileStream: videoStream,
-    driveLocation: record.recording.driveDestination
-  });
+  if(!fs.existsSync(videoFilename)) {
+    const videoStream = fs.createWriteStream(videoFilename);
+    await archiveVideo({
+      fileStream: videoStream,
+      driveLocation: record.recording.driveDestination
+    });
+  } else {
+    console.log('  - Video archive already exists.');
+  }
 
   // write .log transcript
   const logTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.log`);
   const logFileStream = fs.createWriteStream(logTranscriptFilename);
-  await archiveTranscript({
-    mediaType: 'text/plain',
-    docLocation: record.transcript.docsDestination,
-    fileStream: logFileStream
-  });
+  if(!fs.existsSync(logTranscriptFilename)) {
+      await archiveTranscript({
+        mediaType: 'text/plain',
+        docLocation: record.transcript.docsDestination,
+        fileStream: logFileStream
+      });
+  } else {
+    console.log('  - Text transcript already exists (text/plain).');
+  }
 
   // write .md transcript
   const mdTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.md`);
-  const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
-  await archiveTranscript({
-    mediaType: 'text/markdown',
-    docLocation: record.transcript.docsDestination,
-    fileStream: mdFileStream
-  });
+  if(!fs.existsSync(logTranscriptFilename)) {
+    const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
+    await archiveTranscript({
+      mediaType: 'text/markdown',
+      docLocation: record.transcript.docsDestination,
+      fileStream: mdFileStream
+    });
+  } else {
+    console.log('  - Text transcript already exists (text/markdown).');
+  }
 
   if(options.email) {
     // get the transcript
