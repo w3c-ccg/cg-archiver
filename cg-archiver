@@ -39,31 +39,31 @@ for(let meeting of config.meetings) {
   // archive the video recording
   const videoFilename = path.join(
     config.logDir, `${config.community}-${meeting.slug}-${date}.mp4`);
-  // const videoStream = fs.createWriteStream(videoFilename);
-  // await archiveVideo({
-  //   fileStream: videoStream,
-  //   driveLocation: record.recording.driveDestination
-  // });
+  const videoStream = fs.createWriteStream(videoFilename);
+  await archiveVideo({
+    fileStream: videoStream,
+    driveLocation: record.recording.driveDestination
+  });
 
   // write .log transcript
   const logTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.log`);
-  // const logFileStream = fs.createWriteStream(logTranscriptFilename);
-  // await archiveTranscript({
-  //   mediaType: 'text/plain',
-  //   docLocation: record.transcript.docsDestination,
-  //   fileStream: logFileStream
-  // });
+  const logFileStream = fs.createWriteStream(logTranscriptFilename);
+  await archiveTranscript({
+    mediaType: 'text/plain',
+    docLocation: record.transcript.docsDestination,
+    fileStream: logFileStream
+  });
 
   // write .md transcript
   const mdTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.md`);
-  // const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
-  // await archiveTranscript({
-  //   mediaType: 'text/markdown',
-  //   docLocation: record.transcript.docsDestination,
-  //   fileStream: mdFileStream
-  // });
+  const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
+  await archiveTranscript({
+    mediaType: 'text/markdown',
+    docLocation: record.transcript.docsDestination,
+    fileStream: mdFileStream
+  });
 
   if(options.email) {
     // get the transcript
@@ -76,6 +76,7 @@ for(let meeting of config.meetings) {
 
       // email meeting summary
       await emailSummary({config, meeting, date, summary, transcript});
+      console.log(`  - Sent email to ${meeting.email}`);
     } else {
       console.error('Error: Failed to summarize empty transcript.');
     }

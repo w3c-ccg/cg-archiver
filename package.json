@@ -31,6 +31,7 @@
   "dependencies": {
     "@google-apps/meet": "^0.4.0",
     "@google-cloud/local-auth": "^3.0.1",
+    "@google/generative-ai": "^0.24.0",
     "commander": "^13.1.0",
     "googleapis": "^146.0.0",
     "moment": "^2.30.1",
