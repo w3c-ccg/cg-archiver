@@ -27,7 +27,7 @@ let date = (options.date) ?
   moment(options.date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
 
 for(let meeting of config.meetings) {
-  meeting.slug = meeting.name.toLowerCase().replace(' ', '-');
+  meeting.slug = meeting.name.toLowerCase().replaceAll(' ', '-');
   // get record for meeting and date
   let record = await getRecords({meeting: meeting.googleMeetId, date});
   if(!record.transcript) {
