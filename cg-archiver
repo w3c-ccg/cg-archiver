@@ -20,6 +20,8 @@ program
     'Meeting date to process', moment().format('YYYY-MM-DD'))
   .option('-e, --email',
     'Send summary email', false)
+  .option('-t, --to <email>',
+    'E-mail address to send summary email to', false)
   .parse(process.argv);
 const options = program.opts();
 
@@ -52,9 +54,9 @@ for(let meeting of config.meetings) {
   // write .log transcript
   const logTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.log`);
-  const logFileStream = fs.createWriteStream(logTranscriptFilename);
   if(!fs.existsSync(logTranscriptFilename)) {
-      await archiveTranscript({
+    const logFileStream = fs.createWriteStream(logTranscriptFilename);
+    await archiveTranscript({
         mediaType: 'text/plain',
         docLocation: record.transcript.docsDestination,
         fileStream: logFileStream
@@ -87,8 +89,9 @@ for(let meeting of config.meetings) {
       const summary = await generateSummary({config, meeting, date, transcript});
 
       // email meeting summary
-      await emailSummary({config, meeting, date, summary, transcript});
-      console.log(`  - Sent email to ${meeting.email}`);
+      await emailSummary(
+        {config, meeting, email: options.to, date, summary, transcript});
+      console.log(`  - Sent email to ${options.to || meeting.email}`);
     } else {
       console.error('Error: Failed to summarize empty transcript.');
     }
