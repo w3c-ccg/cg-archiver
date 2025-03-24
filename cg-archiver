@@ -2,8 +2,8 @@
 import config from './config.js';
 import fs from 'node:fs';
 import {
-  getRecords, archiveVideo, archiveTranscript, transcriptExists,
-  generateSummary, emailSummary
+  getRecords, downloadVideo, downloadTranscript, transcriptExists,
+  generateSummary, uploadToArchive, emailSummary
 } from './lib/google-apps.js';
 import moment from 'moment';
 import path from 'node:path';
@@ -22,12 +22,19 @@ program
     'Send summary email', false)
   .option('-t, --to <email>',
     'E-mail address to send summary email to', false)
+  .option('-u, --upload',
+    'Upload to archive server', false)
   .parse(process.argv);
 const options = program.opts();
 
 let date = (options.date) ?
   moment(options.date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
 
+// load secrets from the environment
+config.geminiApiKey = process.env.GEMINI_API_KEY;
+config.archive.privateKey = process.env.ARCHIVE_SSH_KEY;
+
+let meetingsFound = false;
 for(let meeting of config.meetings) {
   meeting.slug = meeting.name.toLowerCase().replaceAll(' ', '-');
   // get record for meeting and date
@@ -36,19 +43,31 @@ for(let meeting of config.meetings) {
     continue;
   } else {
     console.log(`Archiving ${meeting.name} meeting for ${date}...`);
+    meetingsFound = true;
   }
 
-  // archive the video recording
+  // download the video recording
   const videoFilename = path.join(
     config.logDir, `${config.community}-${meeting.slug}-${date}.mp4`);
   if(!fs.existsSync(videoFilename)) {
     const videoStream = fs.createWriteStream(videoFilename);
-    await archiveVideo({
+    await downloadVideo({
       fileStream: videoStream,
       driveLocation: record.recording.driveDestination
     });
   } else {
-    console.log('  - Video archive already exists.');
+    console.log('  - Video already downloaded (video/mp4).');
+  }
+
+  // upload the video recording to the archive
+  if(options.upload && fs.existsSync(videoFilename)) {
+    const videoFileStream = fs.createReadStream(videoFilename);
+    await uploadToArchive({
+      fileStream: videoFileStream,
+      filename: path.basename(videoFilename),
+      archiveConfig: config.archive
+    });
+    console.log('  - Uploaded video to archive (video/mp4).');
   }
 
   // write .log transcript
@@ -56,13 +75,24 @@ for(let meeting of config.meetings) {
     `${config.community}-${meeting.slug}-${date}.log`);
   if(!fs.existsSync(logTranscriptFilename)) {
     const logFileStream = fs.createWriteStream(logTranscriptFilename);
-    await archiveTranscript({
+    await downloadTranscript({
         mediaType: 'text/plain',
         docLocation: record.transcript.docsDestination,
         fileStream: logFileStream
       });
   } else {
-    console.log('  - Text transcript already exists (text/plain).');
+    console.log('  - Text transcript already downloaded (text/plain).');
+  }
+
+  // upload the .log transcript to the archive
+  if(options.upload && fs.existsSync(logTranscriptFilename)) {
+    const logFileStream = fs.createReadStream(logTranscriptFilename);
+    await uploadToArchive({
+      fileStream: logFileStream,
+      filename: path.basename(logTranscriptFilename),
+      archiveConfig: config.archive
+    });
+    console.log('  - Uploaded text transcript to archive (text/plain).');
   }
 
   // write .md transcript
@@ -70,13 +100,24 @@ for(let meeting of config.meetings) {
     `${config.community}-${meeting.slug}-${date}.md`);
   if(!fs.existsSync(logTranscriptFilename)) {
     const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
-    await archiveTranscript({
+    await downloadTranscript({
       mediaType: 'text/markdown',
       docLocation: record.transcript.docsDestination,
       fileStream: mdFileStream
     });
   } else {
-    console.log('  - Text transcript already exists (text/markdown).');
+    console.log('  - Text transcript already downloaded (text/markdown).');
+  }
+
+  // upload the .md transcript to the archive
+  if(options.upload && fs.existsSync(mdTranscriptFilename)) {
+    const logFileStream = fs.createReadStream(mdTranscriptFilename);
+    await uploadToArchive({
+      fileStream: logFileStream,
+      filename: path.basename(mdTranscriptFilename),
+      archiveConfig: config.archive
+    });
+    console.log('  - Uploaded text transcript to archive (text/markdown).');
   }
 
   if(options.email) {
@@ -96,4 +137,8 @@ for(let meeting of config.meetings) {
       console.error('Error: Failed to summarize empty transcript.');
     }
   }
+}
+
+if(!meetingsFound) {
+  console.log(`No meetings to archive found for ${date}.`);
 }
