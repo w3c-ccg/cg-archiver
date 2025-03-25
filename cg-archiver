@@ -33,12 +33,13 @@ let date = (options.date) ?
 // load secrets from the environment
 config.geminiApiKey = process.env.GEMINI_API_KEY;
 config.archive.privateKey = process.env.ARCHIVE_SSH_KEY;
+config.googleApiOauth2Token = process.env.OAUTH2_TOKEN;
 
 let meetingsFound = false;
 for(let meeting of config.meetings) {
   meeting.slug = meeting.name.toLowerCase().replaceAll(' ', '-');
   // get record for meeting and date
-  let record = await getRecords({meeting: meeting.googleMeetId, date});
+  let record = await getRecords({meeting: meeting.googleMeetId, date, config});
   if(!record.transcript) {
     continue;
   } else {
@@ -53,7 +54,8 @@ for(let meeting of config.meetings) {
     const videoStream = fs.createWriteStream(videoFilename);
     await downloadVideo({
       fileStream: videoStream,
-      driveLocation: record.recording.driveDestination
+      driveLocation: record.recording.driveDestination,
+      config
     });
   } else {
     console.log('  - Video already downloaded (video/mp4).');
@@ -65,7 +67,7 @@ for(let meeting of config.meetings) {
     await uploadToArchive({
       fileStream: videoFileStream,
       filename: path.basename(videoFilename),
-      archiveConfig: config.archive
+      config
     });
     console.log('  - Uploaded video to archive (video/mp4).');
   }
@@ -78,7 +80,8 @@ for(let meeting of config.meetings) {
     await downloadTranscript({
         mediaType: 'text/plain',
         docLocation: record.transcript.docsDestination,
-        fileStream: logFileStream
+        fileStream: logFileStream,
+        config
       });
   } else {
     console.log('  - Text transcript already downloaded (text/plain).');
@@ -90,7 +93,7 @@ for(let meeting of config.meetings) {
     await uploadToArchive({
       fileStream: logFileStream,
       filename: path.basename(logTranscriptFilename),
-      archiveConfig: config.archive
+      config
     });
     console.log('  - Uploaded text transcript to archive (text/plain).');
   }
@@ -103,7 +106,8 @@ for(let meeting of config.meetings) {
     await downloadTranscript({
       mediaType: 'text/markdown',
       docLocation: record.transcript.docsDestination,
-      fileStream: mdFileStream
+      fileStream: mdFileStream,
+      config
     });
   } else {
     console.log('  - Text transcript already downloaded (text/markdown).');
@@ -115,7 +119,7 @@ for(let meeting of config.meetings) {
     await uploadToArchive({
       fileStream: logFileStream,
       filename: path.basename(mdTranscriptFilename),
-      archiveConfig: config.archive
+      config
     });
     console.log('  - Uploaded text transcript to archive (text/markdown).');
   }
@@ -127,11 +131,11 @@ for(let meeting of config.meetings) {
 
     // generate meeting summary
     if(transcript.length > 100) {
-      const summary = await generateSummary({config, meeting, date, transcript});
+      const summary = await generateSummary({meeting, date, transcript, config});
 
       // email meeting summary
       await emailSummary(
-        {config, meeting, email: options.to, date, summary, transcript});
+        {meeting, email: options.to, date, summary, transcript, config});
       console.log(`  - Sent email to ${options.to || meeting.email}`);
     } else {
       console.error('Error: Failed to summarize empty transcript.');
