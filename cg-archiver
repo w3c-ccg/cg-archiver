@@ -129,14 +129,13 @@ for(let meeting of config.meetings) {
     const transcript =
       await transcriptExists({transcriptFilename: mdTranscriptFilename});
 
-    // generate meeting summary
+    // generate and email meeting summary
     if(transcript.length > 100) {
-      const summary = await generateSummary({meeting, date, transcript, config});
-
-      // email meeting summary
-      await emailSummary(
-        {meeting, email: options.to, date, summary, transcript, config});
-      console.log(`  - Sent email to ${options.to || meeting.email}`);
+      let email = options.to || meeting.email;
+      const summary =
+        await generateSummary({meeting, date, transcript, config});
+      await emailSummary({meeting, email, date, summary, transcript, config});
+      console.log(`  - Sent email to ${email}`);
     } else {
       console.error('Error: Failed to summarize empty transcript.');
     }
