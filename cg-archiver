@@ -3,7 +3,7 @@ import config from './config.js';
 import fs from 'node:fs';
 import {
   getRecords, downloadVideo, downloadTranscript, transcriptExists,
-  generateSummary, uploadToArchive, emailSummary
+  generateSummary, generateHtml, uploadToArchive, emailSummary
 } from './lib/google-apps.js';
 import moment from 'moment';
 import path from 'node:path';
@@ -122,6 +122,30 @@ for(let meeting of config.meetings) {
       config
     });
     console.log('  - Uploaded text transcript to archive (text/markdown).');
+  }
+
+  // write .html transcript (if the meeting has an associated HTML template)
+  const htmlTranscriptFilename = path.join(config.logDir,
+    `${config.community}-${meeting.slug}-${date}.html`);
+  if(meeting.htmlTemplate && !fs.existsSync(htmlTranscriptFilename)) {
+    const transcript = fs.readFileSync(logTranscriptFilename);
+    const htmlTranscript = await generateHtml({
+      config, meeting, date, transcript
+    });
+    fs.writeFileSync(htmlTranscriptFilename, htmlTranscript);
+  } else {
+    console.log('  - HTML transcript already generated (text/html).');
+  }
+
+  // upload the .html transcript to the archive
+  if(options.upload && fs.existsSync(htmlTranscriptFilename)) {
+    const logFileStream = fs.createReadStream(htmlTranscriptFilename);
+    await uploadToArchive({
+      fileStream: logFileStream,
+      filename: path.basename(htmlTranscriptFilename),
+      config
+    });
+    console.log('  - Uploaded HTML transcript to archive (text/html).');
   }
 
   if(options.email) {
