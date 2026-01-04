@@ -128,11 +128,14 @@ for(let meeting of config.meetings) {
   const htmlTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.html`);
   if(meeting.htmlTemplate && !fs.existsSync(htmlTranscriptFilename)) {
-    const transcript = fs.readFileSync(logTranscriptFilename);
+    // get the transcript
+    const transcript =
+      await transcriptExists({transcriptFilename: logTranscriptFilename});
     const htmlTranscript = await generateHtml({
       config, meeting, date, transcript
     });
     fs.writeFileSync(htmlTranscriptFilename, htmlTranscript);
+    console.log(`  - HTML archival complete (text/html).`);
   } else {
     console.log('  - HTML transcript already generated (text/html).');
   }
