@@ -2,7 +2,8 @@
 import config from './config.js';
 import fs from 'node:fs';
 import {
-  getRecords, downloadVideo, downloadTranscript, transcriptExists,
+  getRecords, downloadVideo, downloadTranscript, downloadChatLog,
+  readTranscriptSync, readChatLogSync,
   generateSummary, generateHtml, uploadToArchive, emailSummary
 } from './lib/google-apps.js';
 import moment from 'moment';
@@ -39,7 +40,7 @@ let meetingsFound = false;
 for(let meeting of config.meetings) {
   meeting.slug = meeting.name.toLowerCase().replaceAll(' ', '-');
   // get record for meeting and date
-  let record = await getRecords({meeting: meeting.googleMeetId, date, config});
+  let record = await getRecords({meeting, date, config});
   if(!record.transcript) {
     continue;
   } else {
@@ -124,15 +125,32 @@ for(let meeting of config.meetings) {
     console.log('  - Uploaded text transcript to archive (text/markdown).');
   }
 
+  // write chat log
+  const chatLogFilename = path.join(config.logDir,
+    `${config.community}-${meeting.slug}-${date}-chat.log`);
+  if(!fs.existsSync(chatLogFilename)) {
+    const logFileStream = fs.createWriteStream(chatLogFilename);
+    await downloadChatLog({
+        mediaType: 'text/plain',
+        docLocation: record.chatlog.docsDestination,
+        fileStream: logFileStream,
+        config
+      });
+  } else {
+    console.log('  - Chat log already downloaded (text/plain).');
+  }
+
   // write .html transcript (if the meeting has an associated HTML template)
   const htmlTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.html`);
   if(meeting.htmlTemplate && !fs.existsSync(htmlTranscriptFilename)) {
     // get the transcript
     const transcript =
-      await transcriptExists({transcriptFilename: logTranscriptFilename});
+      await readTranscriptSync({transcriptFilename: logTranscriptFilename});
+    const chatLog =
+      await readChatLogSync({chatLogFilename});
     const htmlTranscript = await generateHtml({
-      config, meeting, date, transcript
+      config, meeting, date, transcript, chatLog
     });
     fs.writeFileSync(htmlTranscriptFilename, htmlTranscript);
     console.log(`  - HTML archival complete (text/html).`);
@@ -154,7 +172,7 @@ for(let meeting of config.meetings) {
   if(options.email) {
     // get the transcript
     const transcript =
-      await transcriptExists({transcriptFilename: mdTranscriptFilename});
+      await readTranscriptSync({transcriptFilename: mdTranscriptFilename});
 
     // generate and email meeting summary
     if(transcript.length > 100) {
