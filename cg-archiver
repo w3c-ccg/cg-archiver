@@ -3,8 +3,8 @@ import config from './config.js';
 import fs from 'node:fs';
 import {
   getRecords, downloadVideo, downloadTranscript, downloadChatLog,
-  readTranscriptSync, readChatLogSync,
-  generateSummary, generateHtml, uploadToArchive, emailSummary
+  readTranscriptSync, readChatLogSync, generateSummary, generateIrcLog,
+  scribe2GenerateHtml, uploadToArchive, emailSummary
 } from './lib/google-apps.js';
 import moment from 'moment';
 import path from 'node:path';
@@ -75,7 +75,7 @@ for(let meeting of config.meetings) {
 
   // write .log transcript
   const logTranscriptFilename = path.join(config.logDir,
-    `${config.community}-${meeting.slug}-${date}.log`);
+    `${config.community}-${meeting.slug}-${date}-transcript.log`);
   if(!fs.existsSync(logTranscriptFilename)) {
     const logFileStream = fs.createWriteStream(logTranscriptFilename);
     await downloadTranscript({
@@ -101,7 +101,7 @@ for(let meeting of config.meetings) {
 
   // write .md transcript
   const mdTranscriptFilename = path.join(config.logDir,
-    `${config.community}-${meeting.slug}-${date}.md`);
+    `${config.community}-${meeting.slug}-${date}-transcript.md`);
   if(!fs.existsSync(logTranscriptFilename)) {
     const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
     await downloadTranscript({
@@ -140,18 +140,27 @@ for(let meeting of config.meetings) {
     console.log('  - Chat log already downloaded (text/plain).');
   }
 
-  // write .html transcript (if the meeting has an associated HTML template)
+  // generate .html transcript (scribe2)
   const htmlTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}.html`);
-  if(meeting.htmlTemplate && !fs.existsSync(htmlTranscriptFilename)) {
-    // get the transcript
+  if(meeting.scribe2 && !fs.existsSync(htmlTranscriptFilename)) {
     const transcript =
       await readTranscriptSync({transcriptFilename: logTranscriptFilename});
     const chatLog =
       await readChatLogSync({chatLogFilename});
-    const htmlTranscript = await generateHtml({
+
+    // generate IRC log
+    const ircLogFilename = path.join(config.logDir,
+      `${config.community}-${meeting.slug}-${date}-irc.log`);
+    const ircLog = await generateIrcLog({
       config, meeting, date, transcript, chatLog
     });
+    fs.writeFileSync(ircLogFilename, ircLog);
+
+    // generate HTML
+    const htmlTranscript = await scribe2GenerateHtml({
+      config, meeting, date, transcript, ircLogFilename});
+
     fs.writeFileSync(htmlTranscriptFilename, htmlTranscript);
     console.log(`  - HTML archival complete (text/html).`);
   } else {
