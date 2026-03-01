@@ -10,6 +10,7 @@ import moment from 'moment';
 import path from 'node:path';
 import process from 'process';
 import {Command} from 'commander';
+import {NodeHtmlMarkdown} from 'node-html-markdown';
 
 // name of the cache file
 const CACHE_FILENAME = 'cache.json';
@@ -114,17 +115,6 @@ for(let meeting of config.meetings) {
     console.log('  - Text transcript already downloaded (text/markdown).');
   }
 
-  // upload the .md transcript to the archive
-  if(options.upload && fs.existsSync(mdTranscriptFilename)) {
-    const logFileStream = fs.createReadStream(mdTranscriptFilename);
-    await uploadToArchive({
-      fileStream: logFileStream,
-      filename: path.basename(mdTranscriptFilename),
-      config
-    });
-    console.log('  - Uploaded text transcript to archive (text/markdown).');
-  }
-
   // write chat log
   const chatLogFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}-chat.log`);
@@ -149,6 +139,7 @@ for(let meeting of config.meetings) {
     const chatLog =
       await readChatLogSync({chatLogFilename});
 
+
     // generate IRC log
     const ircLogFilename = path.join(config.logDir,
       `${config.community}-${meeting.slug}-${date}-irc.log`);
@@ -157,13 +148,28 @@ for(let meeting of config.meetings) {
     });
     fs.writeFileSync(ircLogFilename, ircLog);
 
-    // generate HTML
+    // generate HTML and Markdown
     const htmlTranscript = await scribe2GenerateHtml({ircLogFilename});
+    const mdTranscript = NodeHtmlMarkdown.translate(htmlTranscript, {});
+    const enhancedMdTranscript =
+      mdTranscript.replaceAll('\\_', ' ').replaceAll('<', '')
 
     fs.writeFileSync(htmlTranscriptFilename, htmlTranscript);
+    fs.writeFileSync(mdTranscriptFilename, enhancedMdTranscript);
     console.log(`  - HTML archival complete (text/html).`);
   } else {
     console.log('  - HTML transcript already generated (text/html).');
+  }
+
+  // upload the .md transcript to the archive
+  if(options.upload && fs.existsSync(mdTranscriptFilename)) {
+    const logFileStream = fs.createReadStream(mdTranscriptFilename);
+    await uploadToArchive({
+      fileStream: logFileStream,
+      filename: path.basename(mdTranscriptFilename),
+      config
+    });
+    console.log('  - Uploaded text transcript to archive (text/markdown).');
   }
 
   // upload the .html transcript to the archive
