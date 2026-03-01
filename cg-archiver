@@ -157,7 +157,6 @@ for(let meeting of config.meetings) {
     });
     fs.writeFileSync(ircLogFilename, ircLog);
 
-    console.log("TRANSCRIPT", transcript, "CHAT", chatLog);
     // generate HTML
     const htmlTranscript = await scribe2GenerateHtml({ircLogFilename});
 
