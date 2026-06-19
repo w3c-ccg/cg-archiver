@@ -103,7 +103,7 @@ for(let meeting of config.meetings) {
   // write .md transcript
   const mdTranscriptFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}-transcript.md`);
-  if(!fs.existsSync(logTranscriptFilename)) {
+  if(!fs.existsSync(mdTranscriptFilename)) {
     const mdFileStream = fs.createWriteStream(mdTranscriptFilename);
     await downloadTranscript({
       mediaType: 'text/markdown',
@@ -118,7 +118,10 @@ for(let meeting of config.meetings) {
   // write chat log
   const chatLogFilename = path.join(config.logDir,
     `${config.community}-${meeting.slug}-${date}-chat.log`);
-  if(!fs.existsSync(chatLogFilename)) {
+  if(!record.chatlog?.docsDestination?.document) {
+    console.log('  - No chat log found for this meeting.');
+    fs.writeFileSync(chatLogFilename, '');
+  } else if(!fs.existsSync(chatLogFilename)) {
     const logFileStream = fs.createWriteStream(chatLogFilename);
     await downloadChatLog({
         mediaType: 'text/plain',
